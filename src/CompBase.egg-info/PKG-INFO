@@ -1,0 +1,197 @@
+Metadata-Version: 2.4
+Name: CompBase
+Version: 0.1.4
+Summary: Base Class for Derived Researcher Class
+Home-page: https://github.com/ElenYoung/CompBase
+Author: Young
+Author-email: yang13515360252@163.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+Dynamic: summary
+
+# CompBase 说明文档
+
+CompBase中主要定义了抽象基类`BaseResearcher`，该基类用于规范派生类的定义。
+
+## 1. 派生类的定义
+
+### 定义派生类时需传递的参数
+
+| 参数 | 类型 | 必须包含的键 | 说明 |
+|------|------|--------------|------|
+| `api_config` | `dict` | `model`, `api_key`, `base_url` | 用于调用外部大模型 |
+| `db_config` | `dict` | `host`, `port`, `user`, `password`, `database` | 用于连接 ClickHouse 数据库 |
+| `researcher_name` | `str` |无 | 策略/研究员的名字，非必要参数 |
+
+
+### 必须定义的成员函数
+
+
+
+| 方法名              | 参数说明                                                                 | 返回类型                             | 功能要求                                                                                                                                 |
+|---------------------|--------------------------------------------------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `load_data_all`     | `start_date: str`/`end_date: str`（格式：`YYYY-MM-DD`）                                                                 | `None`                               | 必须通过该函数加载所有的数据，需使用 `quantchdb` 访问数据，如果需要其他数据请单独联系。                                                       |
+| `load_data_curr`    | `curr_date: str`（格式：`YYYY-MM-DD`）                                   | `None`                               | 加载获取当前日期 (`curr_date`) 持仓所需的数据。                                                                                     |
+| `get_daily_holdings`| `start_date: str`（格式：`YYYY-MM-DD`）<br>`end_date: str`（格式：`YYYY-MM-DD`） | `Dict[str, Dict[str, float]]`        | 返回每日持仓字典，结构示例：<br>`{'2025-01-01': {'000001': 0.5, '600519': 0.5}, ...}`<br>权重总和不得超过1，不得为负数（不允许做空）。       |
+| `get_current_holdings`| `curr_date: str`（格式：`YYYY-MM-DD`）                                   | `Dict[str, Dict[str, float]]`        | 返回当前日期 (`curr_date`) 的持仓字典，结构示例：<br>`{'2025-01-01': {'000001': 0.5, '600519': 0.5}}`                                     |
+
+---
+
+### 补充说明
+1. **强制实现要求**  
+   所有派生类必须完全实现上述四个抽象方法，且参数必须保持一致，否则会报错。
+
+2. **参数格式规范**  
+   - 所有日期参数必须为字符串类型，格式严格遵循 `YYYY-MM-DD`（如 `2025-01-01`）。
+   - 返回值中的 `Dict` 结构必须与示例一致，键值类型需匹配。
+
+3. **权重约束**  
+   - `get_daily_holdings` 和 `get_current_holdings` 返回的持仓权重总和需 **≤ 1**，且各个权重不得为负数。
+
+
+
+## 2. 派生类示例
+
+### （1）引入必要库
+```python
+import os
+from CompBase import BaseResearcher
+from quantchdb import ClickHouseDatabase
+import pandas as pd
+```
+
+### （2）初始化配置参数
+```python
+
+api_config = {'model':'qwen3-235B',
+           'base_url':'localhost:8080',
+           'api_key':'empty'
+           }
+
+#此处为了安全起见建议使用.env文件来传递值，os.getenv()能够加载.env文件中的信息
+db_config = {
+  "host": os.getenv("DB_HOST_Server"),
+  "user": os.getenv("DB_USER_Server"),
+  "password": os.getenv("DB_PASSWORD_Server"),
+  "database": os.getenv("DB_DATABASE_Server"),
+  "port": os.getenv("DB_POST_Server")
+}
+```
+
+
+### （3）定义派生类
+
+```python
+class Researcher1(BaseResearcher, 
+                  researcher_name="AlwaysWin", 
+                  api_config=api_config, 
+                  db_config=db_config):
+
+  def __init__(self, **kwargs):
+    self.data = {}   
+    ## 如果需要超参，可以提前定义为类内成员
+    self.theta = kwargs.get('theta') 
+
+  #如果不需要训练模型的话这个函数应该是用不到的
+  def load_data_all(self, start_date, end_date):
+    """
+    start_date和end_date用来标识你所需要的数据范围，方便检查未来函数问题
+    """
+    self.start_date_data = pd.to_datetime(start_date)
+    self.end_date_data = pd.to_datetime(end_date)
+
+    db = ClickHouseDatabase(config=self.db_config, terminal_log=False, file_log=False)
+
+    s_date = (self.start_date_data + pd.DateOffset(months=1)).strftime(format="%Y-%m-%d")
+    e_date = self.end_date_data.strftime(format="%Y-%m-%d")
+
+
+    sql1 = f"""
+      SELECT TradingDate as date,
+             Symbol as code,
+             ReturnDaily as ret,
+             first_value(ReturnDaily) OVER (PARTITION BY Symbol ORDER BY TradingDate ASC ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING) as pre_ret
+
+      FROM etf.etf_daily
+      PREWHERE and(TradingDate >= '{s_date}', TradingDate<='{e_date}', StateCode == 0)
+      ORDER BY TradingDate, Symbol
+    """
+    df = db.fetch(sql1)
+    self.data['all_data'] = df
+    return df
+
+
+  def load_data_curr(self, curr_date):
+    self.curr_date = pd.to_datetime(curr_date)
+
+    db = ClickHouseDatabase(config=self.db_config, terminal=True, file_log=False)
+    s_date = (self.curr_date - pd.DateOffset(months=1)).strftime(format='%Y-%m-%d')
+    sql1 = f"""
+      SELECT TradingDate as date,
+            Symbol as code,
+            first_value(ReturnDaily) OVER (PARTITION BY Symbol ORDER BY TradingDate ASC ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING) as pre_ret
+      FROM etf.etf_daily_csmar
+      PREWHERE and(TradingDate >= '{s_date}', TradingDate<= '{curr_date}', StateCode == 0)
+      ORDER BY TradingDate, Symbol
+    """
+    df = db.fetch(sql1)
+    self.data['curr_data'] = df
+
+
+  def run_always_win_strategy(curr_date, theta):
+
+    data = load_data_curr(curr_date)
+    
+    ## 策略实现(此处省略了)
+
+    strategy_res = {curr_date: holdings}
+    return strategy_res
+
+
+  def get_daily_holdings(self, start_date, end_date):
+
+    ##生成date_list
+
+    daily_holdings = {}
+    
+    for date in date_list:
+        daily_holdings[date] = run_always_win_strategy(date, self.theta)
+
+    ## 格式为 {'2025-01-01':{'000001': 0.5, '600519': 0.5},'2025-01-02':{'600519': 0.3, '300750':0.7}}
+    return daily_holdings
+
+
+
+  def get_current_holdings(self, curr_date):
+
+    curr_holdings =  run_always_win_strategy(curr_date, self.theta)
+    
+    return curr_holdings
+```
+
+**如果需要训练模型，可以在派生类内单独定义训练模型的成员方法和架子啊模型的函数。**
+
+
+## 3. 推荐的文件结构
+
+```
+project_root
+  |yourStrategyName
+  |  |your_strategy_name.py
+  |  |其他自定义的文件...
+  |  |model1.pth   ##如果需要训练模型的话
+  |result
+  |  |daily_holdings.pkl ##规定时间范围内的持仓数据
+```

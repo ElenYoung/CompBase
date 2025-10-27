@@ -1,0 +1,10 @@
+LICENSE.txt
+README.md
+setup.py
+src/CompBase/__init__.py
+src/CompBase/base.py
+src/CompBase/utils.py
+src/CompBase.egg-info/PKG-INFO
+src/CompBase.egg-info/SOURCES.txt
+src/CompBase.egg-info/dependency_links.txt
+src/CompBase.egg-info/top_level.txt

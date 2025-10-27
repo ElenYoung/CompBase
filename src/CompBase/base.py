@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod, ABCMeta
 from typing import Annotated, Dict, List, Tuple, Any, Callable
-from utils import validate_date_parameters, auto_validate
+from .utils import validate_date_parameters, auto_validate
 import inspect
 
 class SignatureMeta(ABCMeta):
