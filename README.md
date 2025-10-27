@@ -2,6 +2,12 @@
 
 CompBase中主要定义了抽象基类`BaseResearcher`，该基类用于规范派生类的定义。
 
+## 安装
+
+```
+pip install CompBase==0.1.4 -i https://pypi.org/simple
+```
+
 ## 1. 派生类的定义
 
 ### 定义派生类时需传递的参数
