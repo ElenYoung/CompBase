@@ -25,8 +25,8 @@ pip install CompBase==0.1.4 -i https://pypi.org/simple
 
 | 方法名              | 参数说明                                                                 | 返回类型                             | 功能要求                                                                                                                                 |
 |---------------------|--------------------------------------------------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `load_data_all`     | `start_date: str`/`end_date: str`（格式：`YYYY-MM-DD`）                                                                 | `None`                               | 必须通过该函数加载所有的数据，需使用 `quantchdb` 访问数据，如果需要其他数据请单独联系。                                                       |
-| `load_data_curr`    | `curr_date: str`（格式：`YYYY-MM-DD`）                                   | `None`                               | 加载获取当前日期 (`curr_date`) 持仓所需的数据。                                                                                     |
+| `load_data_all`     | `start_date: str`/`end_date: str`（格式：`YYYY-MM-DD`）                                                                 | `Any`                               | 必须通过该函数加载所有的数据，需使用 `quantchdb` 访问数据，如果需要其他数据请单独联系。                                                       |
+| `load_data_curr`    | `curr_date: str`（格式：`YYYY-MM-DD`）                                   | `Any`                               | 加载获取当前日期 (`curr_date`) 持仓所需的数据。                                                                                     |
 | `get_daily_holdings`| `start_date: str`（格式：`YYYY-MM-DD`）<br>`end_date: str`（格式：`YYYY-MM-DD`） | `Dict[str, Dict[str, float]]`        | 返回每日持仓字典，结构示例：<br>`{'2025-01-01': {'000001': 0.5, '600519': 0.5}, ...}`<br>权重总和不得超过1，不得为负数（不允许做空）。       |
 | `get_current_holdings`| `curr_date: str`（格式：`YYYY-MM-DD`）                                   | `Dict[str, Dict[str, float]]`        | 返回当前日期 (`curr_date`) 的持仓字典，结构示例：<br>`{'2025-01-01': {'000001': 0.5, '600519': 0.5}}`                                     |
 
